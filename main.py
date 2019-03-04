@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import random
 import numpy as np
 import definitions
+import tensorflow as tf
 
 
 
@@ -64,7 +65,7 @@ print("first", close_price[0])
 print("last = ",close_price[-1])
 
 # TODO: jak juz zrobie sieć neuronową dla danych sinusoidalnych - poniższe wykomentować i zacząć testy na danych open, high low, close, volume.
-dane_sinusoida = close_price[::-1]
+# dane_sinusoida = close_price[::-1]
 
 a = 1
 def przyklad_policy(dane_do_analizy):
@@ -75,6 +76,36 @@ def przyklad_policy(dane_do_analizy):
     else:
         return 0
 
+########################################################################################################################
+########################################################################################################################
+##########################################faza konstrukcyjna sieci neuronowej###########################################
+########################################################################################################################
+########################################################################################################################
+
+
+n_inputs = 4
+n_steps = 300 # liczba danych w ciagu w sieci rekurencyjnej
+n_neurons = 200
+n_outputs = 3 # bo mam wyscie BUY, SELL HODL
+
+learning_rate = 0.01
+
+X = tf.placeholder(tf.float32, [None, n_steps, n_inputs])
+y = tf.placegolder(tf.float32, [None])
+
+basic_cell = tf.contrib.rnn.BasicRNNCell(num_units=n_neurons) # używam zwykłej komórki dla rnn
+outputs, states = tf.nn.dynamic_rnn(basic_cell, X, dtype=tf.float32)
+
+logits = tf.layers.dense(states, n_outputs)
+xentropy - tf.nn.sparse_softmax_cross_entropy_with_logits(labels=y, logits=logits)
+
+# TODO:  dokończyć
+
+########################################################################################################################
+########################################################################################################################
+##########################################faza konstrukcyjna sieci neuronowej###########################################
+########################################################################################################################
+########################################################################################################################
 
 
 env = gym.make('trading_env-v0')
