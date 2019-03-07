@@ -147,7 +147,7 @@ discount_rate = 0.95
 ########################################################################################################################
 
 
-learning = 0
+learning = 1
 
 
 
@@ -162,6 +162,9 @@ if learning == 1:
                 current_rewards = []
                 current_gradients = []
                 obs = env.reset()
+                print("\n")
+                print(obs)
+                print(obs.reshape(1,n_inputs))
                 for step in range(n_max_steps):
                     action_val, gradients_val = sess.run([action, gradients], feed_dict={X: obs.reshape(1, n_inputs)})
                     obs, reward, done, info = env.step(action_val[0][0])
