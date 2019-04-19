@@ -27,7 +27,7 @@ def discount_and_normalize_rewards(all_rewards, discount_rate):
 amount_episodes = 10
 amount_steps = 2000   # finalnie zeby przesunac wzdluz calego wykresu np jak wykres bedize miec 5000 danych - tu dac 5000.
 
-liczba_danych = 2000
+liczba_danych = 200
 kwota_usd_poczatkowa = 1000
 
 
@@ -95,8 +95,8 @@ def przyklad_policy(dane_do_analizy):
 ######################--------------faza konstrukcyjna sieci neuronowej------------#####################################
 ########################################################################################################################
 
-n_inputs = 2 # tu powinno byc tyle wejsc jak rozmiar tego bufora uczacego. wstepnie daje tylko 1 (close_price)
-n_steps = 20 # liczba danych w ciagu w sieci rekurencyjnej
+n_inputs = 3 # tu powinno byc tyle wejsc jak rozmiar tego bufora uczacego. wstepnie daje tylko 1 (close_price)
+n_steps = 150 # liczba danych w ciagu w sieci rekurencyjnej
 n_neurons = 200 # od czego uzależniam liczbe neuronów? chyba testowo...
 n_hidden = 4
 n_outputs = 3 # bo mam wyscie BUY, SELL HODL
@@ -172,7 +172,7 @@ a = 1
 # TODO: faza wykonawcza wstępnie tylko przepisane, poprawic tak zeby dzialalo z tradingenv (zobacz od linii 220 poniżej
 
 n_iterations = 250 # liczba przebiegów uczacych
-n_max_steps = 1000 # liczba kroków w episodzie
+n_max_steps = 100 # liczba kroków w episodzie
 n_games_per_update = 10 # uczenie polityki co 10 kroków
 save_iterations = 10 # co ile iteracji zapisuje model
 
@@ -200,10 +200,58 @@ with tf.Session() as sess:
         for game in range(n_games_per_update):
             current_rewards = [] # wszystkie pelne nagrodu z bieżącego epizodu
             current_gradients = [] # wszystkie gradienty z biezacego epizodu
-            env.reset(kwota_usd_poczatkowa)
-            for step in range(n_max_steps):
 
-                dane = [[float(dane_do_analizy[0 + step:liczba_danych + step][i]) + 1 for i in range(len(dane_do_analizy[0 + step:liczba_danych + step]))],[float(dane_do_analizy[0 + step:liczba_danych + step][i]) + 1 for i in range(len(dane_do_analizy[0 + step:liczba_danych + step]))]]
+            states = [] # przechowuje aktualny stan - czy kupione, sprzedane czy jak. Jest to jednym z wejsc na moją sieć.
+            for i in range(liczba_danych):
+                states.append(definitions.STATE_HAVE_USDT)
+
+            # nizej rpzypadek gdy chce przejsc przez caly wykres uczacy, a nie tylko przez randomowe fragmenty.
+            env.reset(kwota_usd_poczatkowa)
+            n_max_steps = int(len(dane_do_analizy)/liczba_danych) # w przyblizeniu przechodze przez cale dane
+            for step in range(n_max_steps):
+                print("kolejny step = {0}".format(step))
+                dane = [[float(dane_do_analizy[0 + step:liczba_danych + step][i]) + 1 for i in
+                         range(len(dane_do_analizy[0 + step:liczba_danych + step]))],
+                        [float(dane_do_analizy[0 + step:liczba_danych + step][i]) + 1 for i in
+                         range(len(dane_do_analizy[0 + step:liczba_danych + step]))]]
+
+                dane.append(states) #dodaje aktualny stan gdzie mam tylko usdt, zadnych btc.
+                #plt.plot(dane[0])
+               # plt.show()
+            # niżej przypadek gdy nie chce przechodzic przez caly wykres a chce wyrywac z wykresu pewne randomowe miejsca do uczenia
+            # env.reset(kwota_usd_poczatkowa)
+            # for step in range(n_max_steps):
+            #     print("kolejny step = {0}".format(step))
+            #     rand_value = random.randint(0, len(dane_do_analizy))
+            #     print('rand_value = {0}'.format(rand_value))
+            #     dane = [[float(dane_do_analizy[0 + rand_value:liczba_danych + rand_value][i]) + 1 for i in range(len(dane_do_analizy[0 + rand_value:liczba_danych + rand_value]))], [float(dane_do_analizy[0 + rand_value:liczba_danych + rand_value][i]) + 1 for i in range(len(dane_do_analizy[0 + rand_value:liczba_danych + rand_value]))]]
+            #
+            #     # plt.plot(dane[0])
+            #     # plt.show()
+
+
+                """
+                ########################################################################################################
+                ########################################################################################################
+                ################################---------------------------------------#################################
+                ################################-----------------UWAGA-----------------#################################
+                ################################---------------------------------------#################################
+                ########################################################################################################
+                ########################################################################################################
+                
+                Wyzej mam dane. dane to jakis ciag. np sinusoida. Do X_batch moze powinienem wpisywac jakis fragment tej 
+                sinusoidy.
+                kolejne X_batch to tablicza. w tej tablicy raczej powinienem miec powyzsze dane przesuniete o 1. 
+                W ten sposob moge w calym x batch zrobic swego rodzaju symulacje dla calego przebiegu.
+                
+                
+                
+                Koniecznie zrobic jakies zabezpieczenie zeby nie sprzedawal jesli nie jest kupione i nie kupowal 
+                gdy jest juz kupione. Moze po prostu dac to jako wejscie do sieci aktualny stan. i wtedy jesli sprobuje
+                kupic gdy juz kupione, lub sprzedac gdy juz sprzedane - bardzo duzy ujemny reward
+                
+                
+                """
 
                 dane_2 = np.array(dane)
                 dane_2 = dane_2.T
@@ -216,115 +264,210 @@ with tf.Session() as sess:
 
                 X_batch = X_batch[1:]
 
+                #plt.plot(X_batch[0])
+                #plt.show()
+
+
                 #action_val, gradients_val = sess.run([action, gradients], feed_dict={X: obs.reshape(1, n_inputs)})
                 # tu nizej do X wpisac odpowiednio przeksztalcony wektor danych
+
+
+                """
+                
+                UWAGA WAŻNE!!!!!!!!!!!!!!!!!!!!!!!
+                
+                JAK TU UZALEZNIC OBLICZANE ACTION VAL?
+                W SENSIE... 
+                jesli nie mam usdt to nie powinien mi kupowac. i gdy nie mam btc to nie powinien sprzedawac...
+                
+                Jak na razie zrobic tak jakby bez uwzgledniania tego - moze bedzie dzilac, (chociaz_watpie)
+                
+                O a moze jako jedno z wejsc zrobic aktualny stan ????????????
+                
+                tak robię w tej chwili!
+                
+                """
+
+
                 action_val, gradients_val = sess.run([action, gradients], feed_dict={X: X_batch})
 
                 # action_val to jedna z 3 wartosci, 0, 1 lub 2 - dla kazdego X_batch[index] mam okreslona wartosc wyjscia 0 1 lub 2.
                 # Teraz jak tego uzyc dalej?
-                reward = np.zeros(len(action_val))
-                done = np.zeros(len(action_val))
-                for i in range(len(action_val)):
-                    print(len(action_val))
-                    print(action_val[i][0])
-                    print(definitions.BUY)
-                    if action_val[i][0] == definitions.BUY and env.return_kwota_usdt() != 0:
-                        cena_kupna = env.bought_btc(dane[0])
-                        print("cena_kupna = ", cena_kupna)
-                        testowe_ceny_kupna.append(cena_kupna)
-
-                    elif action_val[i] == definitions.SELL and env.return_kwota_btc() != 0:
-                        cena_sprzedazy = env.sold_btc(dane[0])
-                        print("cena sprzedazy = ", cena_sprzedazy)
-                        testowe_ceny_sprzedazy.append(cena_sprzedazy)
-
-                    reward[i], done[i] = env.step(action_val[i][0])
+                reward = []
+                done = []
 
 
+                """
+                
+                
+                Tych action_val bedzie dokladnie tyle jaki rozmiar bedzie miec X_batch.
+                a wiec musze przeleciec przez caly rozmiar x batch aby przejsc tak jakby przez caly wykres danych
+                (patrz uwaga wyzej)
+                
+                Niżej zadbać, zeby w przypadku gdy nie mam btc - próbuje sprzedać - dać dużą karę.
+                Gdy mam btc i próbuję kupić  dać dużą karę.
+                
+                """
+
+                for i in range(len(action_val)-1):
+                    #print("i = {0}, akcja = {1}".format(i, action_val[i][0]))
+                    dane_close_price = []
+                    for j in range(n_steps):
+                        dane_close_price.append(list(X_batch[i][j])[0])
+                    #print('czy ma teraz kupione czy sprzedane = ', list(X_batch[i][-1])[2])
+                    reward_value, done_v, X_batch = env.step(action_val[i][0], list(X_batch[i][-1])[2], dane_close_price[-1], X_batch, i)
+                    b = 1
+                # for i in range(len(action_val)):
+                #     print("action_val[{0}] = ".format(i), action_val[i][0])
+                #     if action_val[i][0] == definitions.BUY and env.return_kwota_usdt() != 0:
+                #         print("kwota usdt = ", env.return_kwota_usdt())
+                #         cena_kupna = env.bought_btc(dane[0])
+                #         print("cena_kupna = ", cena_kupna)
+                #         reward_value, done_v = env.step(action_val[i][0])
+                #         testowe_ceny_kupna.append(cena_kupna)
+                #
+                #     elif action_val[i] == definitions.SELL and env.return_kwota_btc() != 0:
+                #         print("kwota btc = ", env.return_kwota_btc())
+                #         cena_sprzedazy = env.sold_btc(dane[0])
+                #         print("cena sprzedazy = ", cena_sprzedazy)
+                #         reward_value, done_v = env.step(action_val[i][0])
+                #         testowe_ceny_sprzedazy.append(cena_sprzedazy)
+                #     elif action_val[i] == definitions.HODL:
+                #         print("HOLDUJE")
+                #         reward_value, done_v = env.step(action_val[i][0])
+
+
+                    reward.append(reward_value)
+                    done.append(done_v)
+                    #print('i = ', i)
+                    #print("reward = ", reward)
+                    a = 1
+                    if done[-1]:
+                        break
+
+                """
+                
+                Do current_rewards zapisuje wszystkie kolejne nagrody dla calego mojego przejscia przez wykres danych
+                
+                """
 
                 current_rewards.append(reward)
                 current_gradients.append(gradients_val)
-                if done:
-                    break
+
+            """
+
+             Do all_rewards zapisuje wszystkie zbiory current rewards. czyli dla wszystkich przejsc przez wykres. 
+             A wiec po prostu dla kazdego wylosowanego fragmentu danych w innym iteratorze tablicy.
+
+             """
+
             all_rewards.append(current_rewards)
             all_gradients.append(current_gradients)
+            a = 1
+            print("len all_gradients = ", len(all_gradients))
+            print("len all_rewards = ", len(all_rewards))
+            print("len all_gradients[0] = ", len(all_gradients[0]))
+            print("len all_rewards[0] = ", len(all_rewards[0]))
+            print("len all_gradients[0][0] = ", len(all_gradients[0][0]))
+            print("len all_rewards[0][0] = ", len(all_rewards[0][0]))
+            print("len all_gradients[0][0][0] = ", len(all_gradients[0][0][0]))
+
         # na tym etapie polityka byla uruchomiona przez 10 epizodów
         # i jestesmy gotowi na jej zaktualizowanie za pomoca omawianego wczesniej algorytmu.
-        all_rewards = discount_and_normalize_rewards(all_rewards, discount_rate=discount_rate)
-        feed_dict = {}
-        for var_index, gradient_placeholder in enumerate(gradient_placeholders):
-            mean_gradients = np.mean([reward * all_gradients[game_index][step][var_index]
-                                      for game_index, rewards in enumerate(all_rewards)
-                                      for step, reward in enumerate(rewards)], axis=0)
-            feed_dict[gradient_placeholder] = mean_gradients
-        sess.run(training_op, feed_dict=feed_dict)
+
+
+        # TU SKONCZYLEM POWIEDZMY
+
+        # byc moze reward zle liczone jest - do sprawdzenia.
+        #
+
+
+        # UWAGA TU ZATRZYMAC LICZENIE I POROWNAC all_gradients z all_gradients z pliku  test_siec_samouczaca_.... (mam sssa ma pulpicue)
+
+        for i in range(len(action_val)):
+            all_rewards_ = discount_and_normalize_rewards(all_rewards[i], discount_rate=discount_rate)
+            feed_dict = {}
+            for var_index, gradient_placeholder in enumerate(gradient_placeholders):
+                mean_gradients = np.mean([reward * all_gradients[game_index][step][var_index][i]
+                                          for game_index, rewards in enumerate(all_rewards_)
+                                          for step, reward in enumerate(rewards)], axis=0)
+                feed_dict[gradient_placeholder] = mean_gradients
+            sess.run(training_op, feed_dict=feed_dict)
+
+
         if iteration % save_iterations == 0:
             saver.save(sess, "./my_policy_net_pg.ckpt")
 
 env.close()
 
 
-########################################################################################################################
-#######################--------------faza wykonawcza sieci neuronowej---------------####################################
-########################################################################################################################
-
-env = gym.make('trading_env-v0')
-
-totals = []
-
-testowe_ceny_kupna = []
-testowe_ceny_sprzedazy = []
-tab_testowe_ceny_kupna = []
-tab_testowe_ceny_sprzedazy = []
-
-dane_do_analizy = dane_sinusoida
-i=0
-
-for episode in range(amount_episodes):
-    episode_rewards = 0
-    env.reset(kwota_usd_poczatkowa)
-
-    for step in range(amount_steps):
-        dane = [float(dane_do_analizy[0+step:liczba_danych + step][i]) + 1 for i in range(len(dane_do_analizy[0 + step:liczba_danych + step]))]
-
-        action = przyklad_policy(dane)
-
-        if action == definitions.BUY and env.return_kwota_usdt() != 0:
-            cena_kupna = env.bought_btc(dane)
-            testowe_ceny_kupna.append(cena_kupna)
-
-        elif action == definitions.SELL and env.return_kwota_btc() != 0:
-            cena_sprzedazy = env.sold_btc(dane)
-            testowe_ceny_sprzedazy.append(cena_sprzedazy)
-
-        else:
-            i += 1
-           # print("jałowo i = ", i)
-
-        reward, done = env.step(action)
-
-        episode_rewards += reward
-        if done:
-            break
-
-    print("episode iterator = ", episode)
-    totals.append(episode_rewards)
-    tab_testowe_ceny_kupna.append(testowe_ceny_kupna)
-    tab_testowe_ceny_sprzedazy.append(testowe_ceny_sprzedazy)
-    testowe_ceny_sprzedazy = []
-    testowe_ceny_kupna = []
-    i = 0
-
-print("\n\r wyniki koncowe:")
-
-print(np.mean(totals))
-print(np.std(totals))
-print(np.min(totals))
-print(np.max(totals))
 
 
 
-a = 1
+
+
+# ########################################################################################################################
+# #######################--------------faza wykonawcza sieci neuronowej---------------####################################
+# ########################################################################################################################
+#
+# env = gym.make('trading_env-v0')
+#
+# totals = []
+#
+# testowe_ceny_kupna = []
+# testowe_ceny_sprzedazy = []
+# tab_testowe_ceny_kupna = []
+# tab_testowe_ceny_sprzedazy = []
+#
+# dane_do_analizy = dane_sinusoida
+# i=0
+#
+# for episode in range(amount_episodes):
+#     episode_rewards = 0
+#     env.reset(kwota_usd_poczatkowa)
+#
+#     for step in range(amount_steps):
+#         dane = [float(dane_do_analizy[0+step:liczba_danych + step][i]) + 1 for i in range(len(dane_do_analizy[0 + step:liczba_danych + step]))]
+#
+#         action = przyklad_policy(dane)
+#         # tu zamiast action = przyklad_policy(dane) powinna byc siec neuronowa
+#
+#         if action == definitions.BUY and env.return_kwota_usdt() != 0:
+#             cena_kupna = env.bought_btc(dane)
+#             testowe_ceny_kupna.append(cena_kupna)
+#
+#         elif action == definitions.SELL and env.return_kwota_btc() != 0:
+#             cena_sprzedazy = env.sold_btc(dane)
+#             testowe_ceny_sprzedazy.append(cena_sprzedazy)
+#
+#         else:
+#             i += 1
+#            # print("jałowo i = ", i)
+#
+#         reward, done = env.step(action)
+#
+#         episode_rewards += reward
+#         if done:
+#             break
+#
+#     print("episode iterator = ", episode)
+#     totals.append(episode_rewards)
+#     tab_testowe_ceny_kupna.append(testowe_ceny_kupna)
+#     tab_testowe_ceny_sprzedazy.append(testowe_ceny_sprzedazy)
+#     testowe_ceny_sprzedazy = []
+#     testowe_ceny_kupna = []
+#     i = 0
+#
+# print("\n\r wyniki koncowe:")
+#
+# print(np.mean(totals))
+# print(np.std(totals))
+# print(np.min(totals))
+# print(np.max(totals))
+#
+#
+#
+# a = 1
 
 
 

@@ -1,3 +1,8 @@
-BUY = 1
-SELL = -1
 HODL = 0
+BUY = 1
+SELL = 2
+
+STATE_HAVE_USDT = 0
+STATE_HAVE_BTC = 1
+
+

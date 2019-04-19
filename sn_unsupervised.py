@@ -171,6 +171,7 @@ if learning == 1:
                     current_rewards.append(reward)
                     current_gradients.append(gradients_val)
                     if done:
+                        print("done! curret rewards length = ", len(current_rewards))
                         break
                 all_rewards.append(current_rewards)
                 all_gradients.append(current_gradients)
